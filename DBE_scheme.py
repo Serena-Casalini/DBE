@@ -159,11 +159,11 @@ def test():
     print("[ENC] Cifratura completata.")
     print("ct", ct)
     
-    ''' # Decifratura per l'utente i=1
+    # Decifratura per l'utente i=1
     M_dec = Dec(pp, public_keys, secret_keys[1], ct, S, 1)
     print("[DEC] Decifratura completata. M_dec:", M_dec)
     
     assert M_dec == M, "Errore: La decifratura non è corretta!"
-    print("[SUCCESS] Decifratura corretta.")'''
+    print("[SUCCESS] Decifratura corretta.")
 
 test()
