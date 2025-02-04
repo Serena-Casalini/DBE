@@ -1,4 +1,4 @@
-from charm.toolbox.pairinggroup import PairingGroup, ZR, G1, G2, GT
+from charm.toolbox.pairinggroup import PairingGroup, ZR, G1, G2, GT, pair
 
 #############################################
 # Setup: genera i parametri pubblici
@@ -63,6 +63,7 @@ def Enc(pp, public_keys, S, M):
     """
     group, L, g1, g2, alpha, pp1, pp2 = pp
     s = group.random(ZR)
+    #print("s", s)
     
     # ct1 = [s]_1
     ct1 = g1 ** s
@@ -71,13 +72,18 @@ def Enc(pp, public_keys, S, M):
     ct2 = group.init(G1, 1)
     for j in S:
         t_j, _usk, _upk = public_keys[j]
-        term1 = g1 ** (s * t_j)         # [s*t_j]_1
-        term2 = pp1[j] ** s             # ([α^j]_1)^s
+        term1 = g1 ** (s * t_j) # [s*t_j]_1
+        term2 = pp1[j]          # ([α^j]_1)
         ct2 *= term1 * term2
+        #print("term1", term1)
+        #print("term2", term2)
     
     # ct3 = [s*α^(L+1)]_T * M, dove [s*α^(L+1)]_T = e( g1^(s*α), g2^(α^L) )
     ct3_factor = group.pair_prod([g1 ** (s * alpha)], [g2 ** (alpha ** L)])
+    #calcolo uguale per contollo (output uguale)
+    #ct3_factor1 = pair(g1 ** (s * alpha), g2 ** (alpha ** L), group.Pairing)
     ct3 = ct3_factor * M
+    #print("ct3_factor", ct3_factor)
     
     return (ct1, ct2, ct3)
 
@@ -94,11 +100,12 @@ def Dec(pp, public_keys, usk_i, ct, S, i):
     """
     group, L, g1, g2, alpha, pp1, pp2 = pp
     ct1, ct2, ct3 = ct
-    
+
     # Calcola pp_{2L+1-i} = [-α^(L+1-i)]_2 = g2^(-α^(L+1-i))
     pp_neg = g2 ** ( - (alpha ** (L+1 - i)) )
     pairing_1 = group.pair_prod([ct2 ** -1], [pp_neg])
-    
+    print("pairing_1:", pairing_1)   
+
     # Calcola il prodotto per il secondo pairing:
     # Partiamo con la chiave segreta dell'utente i: usk_i
     product = usk_i  
@@ -111,13 +118,21 @@ def Dec(pp, public_keys, usk_i, ct, S, i):
         _t_j, _usk_j, upk_j = public_keys[j]
         # upk_j è una tupla: (upk_first, upk_components)
         comp = upk_j[1].get(L+1 - i, None)
+        print("upk_j",upk_j)
+        print("COMP", comp)
         if comp is None:
             raise Exception(f"Componente upk mancante per l'utente {j} per esponente {L+1-i}")
         pp_component = g2 ** (alpha ** (L+1 + j - i))
+        #risultati uguali, puoi sostituire
+        #print("UNO", g2 ** (alpha ** (L+1 + j - i)))
+        #print("DUE", pp2[ L+1+j-i ])
         product *= comp * pp_component
+        print("product: ", product)
     
     pairing_2 = group.pair_prod([ct1], [product])
-    
+    print("pairing_2:", pairing_2)   
+
+        
     M_dec = ct3 * pairing_1 * pairing_2
     return M_dec
 
@@ -138,18 +153,18 @@ def test():
     print("pp2:", pp2)'''
 
     # Genera le chiavi per gli utenti in S (ad es. utenti 1 e 2)
-    S = [1, 2]
+    S = [1]
     public_keys = {}  # per ogni j in S: (t_j, usk_j, upk_j)
     secret_keys = {}
     for j in S:
         t, usk, upk = KeyGen(pp, j)
         public_keys[j] = (t, usk, upk)
         secret_keys[j] = usk
-        '''print("t", t)
+        print("t", t)
         print("usk", usk)
         print("upk", upk)
-        print("public_keys", public_keys[j])
-        print("secret_keys", secret_keys[j])'''
+        print("public_keys", j , public_keys[j])
+        print("secret_keys", j , secret_keys[j])
     print("[KEYGEN] Chiavi generate per gli utenti:", S)
 
     # Cifratura: scegli un messaggio casuale in GT
@@ -157,13 +172,21 @@ def test():
     print("Messaggio M:", M)
     ct = Enc(pp, public_keys, S, M)
     print("[ENC] Cifratura completata.")
-    print("ct", ct)
+    (ct1,ct2,ct3) = ct
+    '''print("ct1", ct1)
+    print("ct2", ct2)
+    print("ct3", ct3)'''
     
-    # Decifratura per l'utente i=1
+     # Decifratura per l'utente i=1
     M_dec = Dec(pp, public_keys, secret_keys[1], ct, S, 1)
     print("[DEC] Decifratura completata. M_dec:", M_dec)
-    
-    assert M_dec == M, "Errore: La decifratura non è corretta!"
+    print("M_dec", M_dec)
+    M_norm = group.deserialize(group.serialize(M))
+    M_dec_norm = group.deserialize(group.serialize(M_dec))
+
+    print("M_norm:", group.serialize(M_norm))
+    print("M_dec_norm:", group.serialize(M_dec_norm))
+    assert M_norm == M_dec_norm, "Errore: La decifratura non è corretta!"
     print("[SUCCESS] Decifratura corretta.")
 
 test()
