@@ -72,7 +72,7 @@ def Enc(pp, public_keys, S, M):
     for j in S:
         t_j, _usk, _upk = public_keys[j]
         term1 = g1 ** (s * t_j) # [s*t_j]_1
-        term2 = pp1[j] ** s       # ([α^j]_1)
+        term2 = pp1[j]      # ([α^j]_1)
         ct2 *= term1 * term2
         #print("term1", term1)
         #print("term2", term2)
