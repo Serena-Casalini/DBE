@@ -89,16 +89,17 @@ def Enc(pp, public_keys, S, M):
     for j in S:
         t_j, _usk, _upk = public_keys[j]
         term1 = g1 ** (s * t_j) # [s*t_j]_1
-        term2 = pp1[j]       # ([α^j]_1)
+        term2 = pp1[j] ** s   # ([α^j]_1) #? ci va il **s o no?
         ct2 *= term1 * term2
         #print("term1", term1)
-        #print("term2", term2)
+        #\print("term2", term2)
     
     # ct3 = [s*α^(L+1)]_T * M, dove [s*α^(L+1)]_T = e( g1^(s*α), g2^(α^L) )
     # g2 ** (alpha ** L) = pp2[L]
-    ct3_factor = group.pair_prod([g1 ** (s * alpha)], [pp2[L]])
-    #print("ct3_factor", ct3_factor)
-    #uguale a print("TEST", pair(g1 ** (s * alpha), g2 ** (alpha ** L), group.Pairing))
+    ct3_factor = pair(g1 ** (s * alpha), g2 ** (alpha ** L)) #pair(g1 ** (s * alpha), g2 ** (alpha ** L), group.Pairing)
+    print("ct3_factor", ct3_factor)
+    print("ct3_factor", 1/ct3_factor)
+    #uguale a print("TEST", group.pair_prod([g1 ** (s * alpha)], [pp2[L]]))
     ct3 = ct3_factor * M
     
     return (ct1, ct2, ct3)
@@ -120,15 +121,15 @@ def Dec(pp, public_keys, usk_i, ct, S, i):
     # Calcola pp_{2L+1-i} = [-α^(L+1-i)]_2 = g2^(-α^(L+1-i))
     pp_neg = pp2[L+1-i] ** -1 #!g2 ** ( - (alpha ** (L+1 - i)) )
     #i valori sono diversi ma il confronto da "pp_neg é corretto"
-    #print("pp_neg", pp_neg)
-    '''print("pp2[L+1-i]**-1", pp2[L+1-i]**-1)
+    '''print("pp_neg", pp2[L+1-i]**-1)
+    print("g2 ** ( - (alpha ** (L+1 - i)))", g2 ** ( - (alpha ** (L+1 - i)) ))
     if pp_neg == pp2[L+1-i] ** -1:
         print("pp_neg è corretto")
     else:
         print("pp_neg NON corrisponde all'inverso di pp2[L+1-i]")'''
-    pairing_1 = group.pair_prod([ct2 ** -1], [pp_neg])
+    pairing_1 = pair(ct2 ** -1,pp_neg) #pair(ct2 ** -1,pp_neg,group.Pairing)
     #print("pairing_1:", pairing_1)   
-    #uguale a print("TEST", pair(ct2 ** -1,pp_neg,group.Pairing))
+    #uguale a print("TEST", group.pair_prod([ct2 ** -1], [pp_neg]))
     # verifica print(ct2 * ct2**-1) ha output 0
     
     
@@ -142,27 +143,28 @@ def Dec(pp, public_keys, usk_i, ct, S, i):
     for j in S:
         if j == i:
             continue
+         # upk_j = public_keys[j][2]
         t_j, usk_j, upk_j = public_keys[j]
         # upk_j è una tupla: (upk_first, upk_components)
         comp = upk_j[1].get(L+1 - i, None)
         #print("upk_j",upk_j)
-        print("COMP", comp)
+        #print("COMP", comp)
         # uguale a print("VERIFICA", g2 ** ( t_j * ( alpha ** (L+1-i))) )
         if comp is None:
             raise Exception(f"Componente upk mancante per l'utente {j} per esponente {L+1-i}")
         pp_component = pp2[ L+1+j-i ] # g2 ** (alpha ** (L+1 + j - i)) 
-        print("pp_component", pp_component)
-        print("prova", g2 ** (alpha ** (L+1 + j - i)) )
+        #print("pp_component", pp_component)
+        #print("g2 ** (alpha ** (L+1 + j - i))", g2 ** (alpha ** (L+1 + j - i)) )
  
         product *= comp * pp_component
     #print("product: ", product)
 
     
-    pairing_2 = group.pair_prod([ct1], [product])
+    pairing_2 = pair(ct1,product) #pair(ct1,product,group.Pairing)
     #print("pairing_2:", pairing_2)   
-    #uguale a print("TEST", pair(ct1,product,group.Pairing))
-
-        
+    print("pairings:", pairing_1 * pairing_2)   
+    #uguale a print("TEST", group.pair_prod([ct1], [product]))
+  
     M_dec = ct3 * pairing_1 * pairing_2
     return M_dec
 
@@ -219,3 +221,5 @@ def test():
     #print("M_dec_norm:", group.serialize(M_dec_norm))
     assert M_norm == M_dec_norm, "Errore: La decifratura non è corretta!"
     print("[SUCCESS] Decifratura corretta.")
+
+test()
