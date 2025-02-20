@@ -1,4 +1,6 @@
 from charm.toolbox.pairinggroup import PairingGroup, ZR, G1, G2, GT, pair
+import timeit
+import matplotlib.pyplot as plt
  
 #############################################
 # Setup: genera i parametri pubblici
@@ -89,7 +91,7 @@ def Enc(pp, public_keys, S, M):
     # (riferimento: [s Ʃj∈S (t_j + α^j)]_1, calcolato come prodotto su j)
     ct2 = group.init(G1, 1)
     for j in S:
-        t_j, _usk, _upk = public_keys[j]
+        t_j, _upk = public_keys[j]
         term1 = g1 ** (s * t_j)   # [s*t_j]_1
         term2 = pp1[j] ** s       # ([α^j]_1)^s
         ct2 *= term1 * term2
@@ -133,7 +135,7 @@ def Dec(pp, public_keys, usk_i, ct, S, i):
     for j in S:
         if j == i:
             continue
-        t_j, usk_j, upk_j = public_keys[j]
+        t_j, upk_j = public_keys[j]
         # Recuperiamo la componente upk_{j,L+1-i} dalla chiave pubblica di j
         comp = upk_j[1].get(L+1 - i, None)
         if comp is None:
@@ -165,7 +167,7 @@ def test():
     secret_keys = {}
     for j in S:
         t, usk, upk = KeyGen(pp, j)
-        public_keys[j] = (t, usk, upk)
+        public_keys[j] = (t, upk)
         secret_keys[j] = usk
     print("[KEYGEN] Chiavi generate per gli utenti:", S)
  
@@ -185,4 +187,71 @@ def test():
     assert M_norm == M_dec_norm, "Errore: La decifratura non è corretta!"
     print("[SUCCESS] Decifratura corretta.")
  
-test()
+#test()
+def benchmark():
+    lambda_param = 128
+    L_values = [2, 3, 4, 5, 10, 20, 30]  # Varia L per testare diverse dimensioni\
+    # Dati da raccogliere
+    setup_times = []
+    keygen_times = []
+    enc_times = []
+    dec_times = []
+
+    for L in L_values:
+        print(f"\n[Benchmarking per L = {L}]")
+        
+        # Misura Setup
+        setup_time = timeit.timeit(lambda: Setup(lambda_param, L), number=5) / 5
+        print(f"Setup time: {setup_time:.6f} sec")
+        setup_times.append(setup_time)
+
+        pp = Setup(lambda_param, L)
+        S = list(range(1, min(3, L+1)))  # Seleziona 2 utenti se possibile
+
+        # Misura KeyGen
+        def keygen_test():
+            public_keys = {}
+            secret_keys = {}
+            for j in S:
+                t, usk, upk = KeyGen(pp, j)
+                public_keys[j] = (t, upk)
+                secret_keys[j] = usk
+            return public_keys, secret_keys
+        
+        keygen_time = timeit.timeit(keygen_test, number=5) / 5
+        print(f"KeyGen time: {keygen_time:.6f} sec")
+        keygen_times.append(keygen_time)
+
+        public_keys, secret_keys = keygen_test()
+        M = pp[0].random(GT)  # Messaggio casuale in GT
+
+        # Misura Enc
+        enc_time = timeit.timeit(lambda: Enc(pp, public_keys, S, M), number=5) / 5
+        print(f"Enc time: {enc_time:.6f} sec")
+        enc_times.append(enc_time)
+
+        ct = Enc(pp, public_keys, S, M)
+
+        # Misura Dec
+        dec_time = timeit.timeit(lambda: Dec(pp, public_keys, secret_keys[S[0]], ct, S, S[0]), number=5) / 5
+        print(f"Dec time: {dec_time:.6f} sec")
+        dec_times.append(dec_time)
+
+    # Creazione del grafico
+    plt.figure(figsize=(8, 5))
+    plt.plot(L_values, setup_times, marker='o', label="Setup")
+    plt.plot(L_values, keygen_times, marker='s', label="KeyGen")
+    plt.plot(L_values, enc_times, marker='^', label="Enc")
+    plt.plot(L_values, dec_times, marker='d', label="Dec")
+
+    # Personalizzazione del grafico
+    plt.xlabel("L (Numero di slot)")
+    plt.ylabel("Tempo di esecuzione (s)")
+    plt.title("Benchmark delle funzioni in base a L")
+    plt.legend()
+    plt.grid(True)
+
+    # Mostra il grafico
+    plt.show()
+
+benchmark()
